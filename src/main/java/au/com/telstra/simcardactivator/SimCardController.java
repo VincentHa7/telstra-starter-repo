@@ -1,6 +1,5 @@
 package au.com.telstra.simcardactivator;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
@@ -9,14 +8,17 @@ import org.springframework.web.client.RestTemplate;
 @RequestMapping("/sim")
 public class SimCardController {
 
-    @Autowired
-    private SimCardRepository simCardRepository;
+    private final SimCardRepository simCardRepository;
+
+    public SimCardController(SimCardRepository simCardRepository) {
+        this.simCardRepository = simCardRepository;
+    }
 
     @PostMapping("/activate")
-    public ResponseEntity<String> activateSim(@RequestBody SimCard simCard) {
+    public ResponseEntity<String> activateSim(@RequestBody SimCardDTO simCardDTO) {
         // Extract ICCID and customer email from the SimCard object
-        String iccid = simCard.getIccid();
-        String customerEmail = simCard.getCustomerEmail();
+        String iccid = simCardDTO.iccid();
+        String customerEmail = simCardDTO.customerEmail();
 
         // Define the actuator URL
         String actuatorUrl = "http://localhost:8444/actuate";
@@ -53,10 +55,10 @@ public class SimCardController {
             simCardRepository.save(newSimCard);
 
             if (activationStatus) {
-                return ResponseEntity.ok("SIM activation successful");
+                return ResponseEntity.status(HttpStatus.CREATED)
+                        .body("SIM activation successful");
             } else {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body("SIM activation failed");
+                return ResponseEntity.ok("SIM activation failed");
             }
         } catch (Exception e) {
             // Save failed activation to database
