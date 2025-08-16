@@ -39,8 +39,9 @@ public class SimCardController {
             ResponseEntity<String> actuatorResponse = restTemplate.exchange(
                     actuatorUrl, HttpMethod.POST, entity, String.class);
 
-            // Check the response from actuator
-            boolean activationStatus = actuatorResponse.getStatusCode() == HttpStatus.OK;
+            // Parse the JSON response to check the success field
+            String responseBody = actuatorResponse.getBody();
+            boolean activationStatus = responseBody != null && responseBody.contains("\"success\":true");
 
             // Save the activation status to the database
             SimCard newSimCard = new SimCard();
@@ -58,6 +59,13 @@ public class SimCardController {
                         .body("SIM activation failed");
             }
         } catch (Exception e) {
+            // Save failed activation to database
+            SimCard newSimCard = new SimCard();
+            newSimCard.setIccid(iccid);
+            newSimCard.setCustomerEmail(customerEmail);
+            newSimCard.setActive(false);
+            simCardRepository.save(newSimCard);
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error calling actuator service: " + e.getMessage());
         }
@@ -77,5 +85,22 @@ public class SimCardController {
 
         // If found, return the SimCard in the response
         return ResponseEntity.ok(simCard);
+    }
+
+    @GetMapping("/query/{iccid}")
+    public ResponseEntity<String> checkActivationStatus(@PathVariable String iccid) {
+        SimCard simCard = simCardRepository.findByIccid(iccid);
+
+        if (simCard == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Not Activated");
+        }
+
+        if (simCard.isActive()) {
+            return ResponseEntity.ok("Activation Successful");
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Not Activated");
+        }
     }
 }
